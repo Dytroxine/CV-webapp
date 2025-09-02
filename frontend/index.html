@@ -132,6 +132,8 @@
             const [resumes, setResumes] = useState([]);
             const [showForm, setShowForm] = useState(false);
             const [improvedContent, setImprovedContent] = useState('');
+            const [editingResume, setEditingResume] = useState(null);
+            const [savingImprovement, setSavingImprovement] = useState(false);
 
             const loadResumes = async () => {
                 try {
@@ -149,16 +151,71 @@
                 loadResumes();
             }, []);
 
-            const handleImprove = async (resumeId) => {
+            const handleImprove = async (resumeId, resumeData) => {
                 try {
                     const token = localStorage.getItem('token');
                     const response = await axios.post(`${API_BASE}/resumes/${resumeId}/improve`, {}, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     setImprovedContent(response.data.improved_content);
+                    // Убираем setEditingResume - не нужно запоминать для редактирования
                 } catch (error) {
                     console.error('Error improving resume:', error);
                 }
+            };
+            const handleEdit = (resume) => {
+                setEditingResume(resume);
+            };
+            const handleSaveImprovement = async () => {
+                if (!improvedContent) return;
+
+                setSavingImprovement(true);
+                try {
+                    const token = localStorage.getItem('token');
+
+                    // Находим ID резюме которое улучшали (последнее на которое нажимали Improve)
+                    const lastImprovedResume = resumes.find(r =>
+                        improvedContent.includes(r.content) ||
+                        improvedContent === r.content + " [Improved]"
+                    );
+
+                    if (lastImprovedResume) {
+                        await axios.put(`${API_BASE}/resumes/${lastImprovedResume.id}`, {
+                            title: lastImprovedResume.title,
+                            content: improvedContent
+                        }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        setImprovedContent('');
+                        loadResumes();
+                    }
+                } catch (error) {
+                    console.error('Error saving improvement:', error);
+                } finally {
+                    setSavingImprovement(false);
+                }
+            };
+
+            const handleEditSubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    const token = localStorage.getItem('token');
+                    await axios.put(`${API_BASE}/resumes/${editingResume.id}`, {
+                        title: editingResume.title,
+                        content: editingResume.content
+                    }, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setEditingResume(null);
+                    loadResumes();
+                } catch (error) {
+                    console.error('Error updating resume:', error);
+                    alert('Error updating resume');
+                }
+            };
+
+            const handleEditCancel = () => {
+                setEditingResume(null);
             };
 
             const handleDelete = async (resumeId) => {
@@ -189,14 +246,53 @@
                         onCancel: () => setShowForm(false)
                     }),
 
+                    // После формы создания резюме добавьте:
+                    editingResume && React.createElement('div', {
+                        style: { border: '1px solid #ffc107', padding: '20px', margin: '10px 0', background: '#fffdf6' }
+                    },
+                        React.createElement('h3', null, '✏️ Edit Resume'),
+                        React.createElement('form', { onSubmit: handleEditSubmit },
+                            React.createElement('input', {
+                                type: 'text',
+                                placeholder: 'Resume Title',
+                                value: editingResume.title,
+                                onChange: (e) => setEditingResume({...editingResume, title: e.target.value}),
+                                required: true
+                            }),
+                            React.createElement('textarea', {
+                                placeholder: 'Resume Content',
+                                value: editingResume.content,
+                                onChange: (e) => setEditingResume({...editingResume, content: e.target.value}),
+                                required: true,
+                                rows: 4
+                            }),
+                            React.createElement('button', { type: 'submit', style: { background: '#ffc107', color: 'black' } }, 'Update Resume'),
+                            React.createElement('button', {
+                                type: 'button',
+                                onClick: handleEditCancel,
+                                style: { background: '#666' }
+                            }, 'Cancel')
+                        )
+                    ),
+
                     improvedContent && React.createElement('div', {
                         style: { border: '1px solid #4CAF50', padding: '15px', margin: '10px 0', background: '#f0fff0' }
                     },
                         React.createElement('h3', null, '✨ Improved Content:'),
-                        React.createElement('p', null, improvedContent)
+                        React.createElement('p', null, improvedContent),
+                        React.createElement('button', {
+                            onClick: handleSaveImprovement,
+                            disabled: savingImprovement,
+                            style: {
+                                background: '#28a745',
+                                marginTop: '10px',
+                                opacity: savingImprovement ? 0.6 : 1
+                            }
+                        }, savingImprovement ? 'Saving...' : 'Save Improved Version')
                     ),
 
                     resumes.map(resume =>
+                        editingResume && editingResume.id === resume.id ? null :
                         React.createElement('div', {
                             key: resume.id,
                             className: 'resume'
@@ -205,9 +301,17 @@
                             React.createElement('p', { style: { whiteSpace: 'pre-wrap' } }, resume.content),
                             React.createElement('div', null,
                                 React.createElement('button', {
-                                    onClick: () => handleImprove(resume.id),
+                                    onClick: () => handleImprove(resume.id, resume),
                                     style: { background: '#4CAF50', marginRight: '10px' }
                                 }, 'Improve with AI'),
+                                React.createElement('button', {
+                                    onClick: () => loadImprovementHistory(resume.id),
+                                    style: { background: '#007bff', marginRight: '10px' }
+                                }, 'History'),
+                                React.createElement('button', {
+                                    onClick: () => handleEdit(resume),
+                                    style: { background: '#ffc107', color: 'black', marginRight: '10px' }
+                                }, 'Edit'),
                                 React.createElement('button', {
                                     onClick: () => handleDelete(resume.id),
                                     style: { background: '#ff4757' }
