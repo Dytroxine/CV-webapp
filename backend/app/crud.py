@@ -24,7 +24,11 @@ def get_user_resumes(db: Session, user_id: int, skip: int = 0, limit: int = 100)
     ).offset(skip).limit(limit).all()
 
 def create_resume(db: Session, resume: schemas.ResumeCreate, user_id: int):
-    db_resume = models.Resume(**resume.dict(), owner_id=user_id)
+    db_resume = models.Resume(
+        title=resume.title,
+        content=resume.content,
+        owner_id=user_id
+    )
     db.add(db_resume)
     db.commit()
     db.refresh(db_resume)

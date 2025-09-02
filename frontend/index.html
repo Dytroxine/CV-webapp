@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CV WebApp</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input, textarea { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #45a049; }
+        .resume { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const API_BASE = 'http://localhost:8000';
+
+        function Login({ onLogin }) {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [isRegistering, setIsRegistering] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+
+                try {
+                    if (isRegistering) {
+                        await axios.post(`${API_BASE}/auth/register`, { email, password });
+                        alert('Registration successful! Please login.');
+                        setIsRegistering(false);
+                    } else {
+                        const formData = new FormData();
+                        formData.append('username', email);
+                        formData.append('password', password);
+                        const response = await axios.post(`${API_BASE}/auth/login`, formData);
+                        localStorage.setItem('token', response.data.access_token);
+                        onLogin();
+                    }
+                } catch (error) {
+                    setError(isRegistering ? 'Registration failed' : 'Login failed');
+                }
+            };
+
+            return (
+                React.createElement('div', { className: 'container' },
+                    React.createElement('h2', null, isRegistering ? 'Register' : 'Login'),
+                    React.createElement('form', { onSubmit: handleSubmit },
+                        React.createElement('input', {
+                            type: 'email',
+                            placeholder: 'Email',
+                            value: email,
+                            onChange: (e) => setEmail(e.target.value),
+                            required: true
+                        }),
+                        React.createElement('input', {
+                            type: 'password',
+                            placeholder: 'Password',
+                            value: password,
+                            onChange: (e) => setPassword(e.target.value),
+                            required: true
+                        }),
+                        error && React.createElement('p', { style: { color: 'red' } }, error),
+                        React.createElement('button', { type: 'submit' }, isRegistering ? 'Register' : 'Login')
+                    ),
+                    React.createElement('button', {
+                        onClick: () => setIsRegistering(!isRegistering),
+                        style: { background: '#666' }
+                    }, isRegistering ? 'Switch to Login' : 'Switch to Register')
+                )
+            );
+        }
+
+        function ResumeForm({ onResumeCreated, onCancel }) {
+            const [title, setTitle] = useState('');
+            const [content, setContent] = useState('');
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    const token = localStorage.getItem('token');
+                    await axios.post(`${API_BASE}/resumes/`, { title, content }, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setTitle('');
+                    setContent('');
+                    setError('');
+                    onResumeCreated();
+                } catch (error) {
+                    setError('Failed to create resume');
+                }
+            };
+
+            return (
+                React.createElement('div', { style: { border: '1px solid #ccc', padding: '20px', margin: '10px 0' } },
+                    React.createElement('h3', null, 'Create New Resume'),
+                    React.createElement('form', { onSubmit: handleSubmit },
+                        React.createElement('input', {
+                            type: 'text',
+                            placeholder: 'Resume Title',
+                            value: title,
+                            onChange: (e) => setTitle(e.target.value),
+                            required: true
+                        }),
+                        React.createElement('textarea', {
+                            placeholder: 'Resume Content',
+                            value: content,
+                            onChange: (e) => setContent(e.target.value),
+                            required: true,
+                            rows: 4
+                        }),
+                        error && React.createElement('p', { style: { color: 'red' } }, error),
+                        React.createElement('button', { type: 'submit' }, 'Create Resume'),
+                        React.createElement('button', { type: 'button', onClick: onCancel, style: { background: '#666' } }, 'Cancel')
+                    )
+                )
+            );
+        }
+
+        function ResumeList() {
+            const [resumes, setResumes] = useState([]);
+            const [showForm, setShowForm] = useState(false);
+            const [improvedContent, setImprovedContent] = useState('');
+
+            const loadResumes = async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await axios.get(`${API_BASE}/resumes/`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setResumes(response.data);
+                } catch (error) {
+                    console.error('Error loading resumes:', error);
+                }
+            };
+
+            useEffect(() => {
+                loadResumes();
+            }, []);
+
+            const handleImprove = async (resumeId) => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await axios.post(`${API_BASE}/resumes/${resumeId}/improve`, {}, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setImprovedContent(response.data.improved_content);
+                } catch (error) {
+                    console.error('Error improving resume:', error);
+                }
+            };
+
+            return (
+                React.createElement('div', { className: 'container' },
+                    React.createElement('h2', null, 'My Resumes'),
+                    React.createElement('button', {
+                        onClick: () => setShowForm(!showForm)
+                    }, showForm ? 'Cancel' : 'Create New Resume'),
+
+                    showForm && React.createElement(ResumeForm, {
+                        onResumeCreated: () => {
+                            setShowForm(false);
+                            loadResumes();
+                        },
+                        onCancel: () => setShowForm(false)
+                    }),
+
+                    improvedContent && React.createElement('div', {
+                        style: { border: '1px solid #4CAF50', padding: '15px', margin: '10px 0', background: '#f0fff0' }
+                    },
+                        React.createElement('h3', null, '✨ Improved Content:'),
+                        React.createElement('p', null, improvedContent)
+                    ),
+
+                    resumes.map(resume =>
+                        React.createElement('div', {
+                            key: resume.id,
+                            className: 'resume'
+                        },
+                            React.createElement('h3', null, resume.title),
+                            React.createElement('p', { style: { whiteSpace: 'pre-wrap' } }, resume.content),
+                            React.createElement('button', {
+                                onClick: () => handleImprove(resume.id),
+                                style: { background: '#4CAF50' }
+                            }, 'Improve with AI')
+                        )
+                    )
+                )
+            );
+        }
+
+        function App() {
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+            useEffect(() => {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    setIsLoggedIn(true);
+                }
+            }, []);
+
+            const handleLogin = () => {
+                setIsLoggedIn(true);
+            };
+
+            const handleLogout = () => {
+                localStorage.removeItem('token');
+                setIsLoggedIn(false);
+            };
+
+            if (!isLoggedIn) {
+                return React.createElement(Login, { onLogin: handleLogin });
+            }
+
+            return (
+                React.createElement('div', null,
+                    React.createElement('div', {
+                        style: {
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '20px',
+                            background: '#333',
+                            color: 'white'
+                        }
+                    },
+                        React.createElement('h1', null, 'CV WebApp'),
+                        React.createElement('button', {
+                            onClick: handleLogout,
+                            style: { background: '#ff4757' }
+                        }, 'Logout')
+                    ),
+                    React.createElement(ResumeList, null)
+                )
+            );
+        }
+
+        ReactDOM.render(React.createElement(App, null), document.getElementById('root'));
+    </script>
+</body>
+</html>

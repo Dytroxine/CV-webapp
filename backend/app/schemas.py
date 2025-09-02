@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -8,8 +8,7 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ResumeBase(BaseModel):
     title: str
@@ -21,5 +20,4 @@ class ResumeCreate(ResumeBase):
 class Resume(ResumeBase):
     id: int
     owner_id: int
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

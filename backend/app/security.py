@@ -14,7 +14,7 @@ def get_password_hash(password):
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
-    SECRET_KEY = "your-secret-key"
+    SECRET_KEY = "WNFKahjBRbxV4qMvZSkIckJKg5fkGrxx-9irGS149K0"
     ALGORITHM = "HS256"
 
     to_encode = data.copy()

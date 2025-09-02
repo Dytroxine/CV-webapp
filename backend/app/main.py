@@ -6,11 +6,12 @@ from .database import SessionLocal, engine
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(title="CV WebApp", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -80,7 +81,7 @@ def delete_resume(
     db_resume = crud.delete_resume(db, resume_id=resume_id, user_id=current_user.id)
     if db_resume is None:
         raise HTTPException(status_code=404, detail="Resume not found")
-    return {"message": "Resume deleted"}
+    return {"message": "Resume deleted successfully"}
 
 
 @app.post("/resumes/{resume_id}/improve")
@@ -95,3 +96,8 @@ def improve_resume(
 
     improved_content = resume.content + " [Improved]"
     return {"improved_content": improved_content}
+
+
+@app.get("/")
+def read_root():
+    return {"message": "CV WebApp API is running"}
