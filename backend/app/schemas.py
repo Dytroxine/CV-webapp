@@ -1,3 +1,5 @@
+import datetime
+
 from pydantic import BaseModel, EmailStr, ConfigDict
 
 class UserBase(BaseModel):
@@ -21,3 +23,16 @@ class Resume(ResumeBase):
     id: int
     owner_id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+class ResumeImprovementBase(BaseModel):
+    original_content: str
+    improved_content: str
+
+class ResumeImprovement(ResumeImprovementBase):
+    id: int
+    resume_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

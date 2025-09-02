@@ -98,6 +98,23 @@ def improve_resume(
     return {"improved_content": improved_content}
 
 
+@app.get("/resumes/{resume_id}/improvements", response_model=list[schemas.ResumeImprovement])
+def get_resume_improvements(
+        resume_id: int,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(auth.get_current_user)
+):
+    resume = crud.get_resume(db, resume_id=resume_id, user_id=current_user.id)
+    if resume is None:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    improvements = db.query(models.ResumeImprovement).filter(
+        models.ResumeImprovement.resume_id == resume_id
+    ).order_by(models.ResumeImprovement.created_at.desc()).all()
+
+    return improvements
+
+
 @app.get("/")
 def read_root():
     return {"message": "CV WebApp API is running"}
