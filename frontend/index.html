@@ -161,6 +161,19 @@
                 }
             };
 
+            const handleDelete = async (resumeId) => {
+                try {
+                    const token = localStorage.getItem('token');
+                    await axios.delete(`${API_BASE}/resumes/${resumeId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    loadResumes();
+                    setImprovedContent(''); // Очищаем улучшенный контент при удалении
+                } catch (error) {
+                    console.error('Error deleting resume:', error);
+                }
+            };
+
             return (
                 React.createElement('div', { className: 'container' },
                     React.createElement('h2', null, 'My Resumes'),
@@ -190,10 +203,16 @@
                         },
                             React.createElement('h3', null, resume.title),
                             React.createElement('p', { style: { whiteSpace: 'pre-wrap' } }, resume.content),
-                            React.createElement('button', {
-                                onClick: () => handleImprove(resume.id),
-                                style: { background: '#4CAF50' }
-                            }, 'Improve with AI')
+                            React.createElement('div', null,
+                                React.createElement('button', {
+                                    onClick: () => handleImprove(resume.id),
+                                    style: { background: '#4CAF50', marginRight: '10px' }
+                                }, 'Improve with AI'),
+                                React.createElement('button', {
+                                    onClick: () => handleDelete(resume.id),
+                                    style: { background: '#ff4757' }
+                                }, 'Delete Resume')
+                            )
                         )
                     )
                 )
