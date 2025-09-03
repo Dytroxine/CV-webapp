@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from jose import JWTError, jwt
-from . import crud, models, schemas, database
+from . import crud, schemas, database
 from .security import verify_password, create_access_token
 
 router = APIRouter()

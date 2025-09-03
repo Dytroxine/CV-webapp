@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 Base = declarative_base()
@@ -10,19 +11,25 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
 
+
 class Resume(Base):
     __tablename__ = "resumes"
+
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
     content = Column(Text)
     owner_id = Column(Integer, ForeignKey("users.id"))
+
+    improvements = relationship("ResumeImprovement", back_populates="resume", cascade="all, delete-orphan")
 
 
 class ResumeImprovement(Base):
     __tablename__ = "resume_improvements"
 
     id = Column(Integer, primary_key=True, index=True)
-    resume_id = Column(Integer, ForeignKey("resumes.id"))
-    original_content = Column(Text)
-    improved_content = Column(Text)
+    resume_id = Column(Integer, ForeignKey("resumes.id", ondelete="CASCADE"))
+    original_content = Column(Text, nullable=False)
+    improved_content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=func.now())
+
+    resume = relationship("Resume", back_populates="improvements")

@@ -34,3 +34,8 @@ class ResumeImprovement(ResumeImprovementBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ResumeImprovementCreate(BaseModel):
+    original_content: str
+    improved_content: str

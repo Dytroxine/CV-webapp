@@ -95,6 +95,8 @@ def improve_resume(
         raise HTTPException(status_code=404, detail="Resume not found")
 
     improved_content = resume.content + " [Improved]"
+
+
     return {"improved_content": improved_content}
 
 
@@ -118,3 +120,68 @@ def get_resume_improvements(
 @app.get("/")
 def read_root():
     return {"message": "CV WebApp API is running"}
+
+
+@app.post("/resumes/{resume_id}/save-improvement")
+def save_improvement(
+        resume_id: int,
+        improvement: schemas.ResumeImprovementCreate,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(auth.get_current_user)
+):
+    resume = crud.get_resume(db, resume_id=resume_id, user_id=current_user.id)
+    if resume is None:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    db_improvement = models.ResumeImprovement(
+        resume_id=resume_id,
+        original_content=improvement.original_content,
+        improved_content=improvement.improved_content
+    )
+    db.add(db_improvement)
+    db.commit()
+    db.refresh(db_improvement)
+
+    return db_improvement
+
+
+@app.delete("/improvements/{improvement_id}")
+def delete_improvement(
+        improvement_id: int,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(auth.get_current_user)
+):
+
+    improvement = db.query(models.ResumeImprovement).join(
+        models.Resume, models.ResumeImprovement.resume_id == models.Resume.id
+    ).filter(
+        models.ResumeImprovement.id == improvement_id,
+        models.Resume.owner_id == current_user.id
+    ).first()
+
+    if improvement is None:
+        raise HTTPException(status_code=404, detail="Improvement not found")
+
+    db.delete(improvement)
+    db.commit()
+
+    return {"message": "Improvement deleted successfully"}
+
+
+@app.delete("/resumes/{resume_id}/improvements")
+def delete_all_improvements(
+        resume_id: int,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(auth.get_current_user)
+):
+    resume = crud.get_resume(db, resume_id=resume_id, user_id=current_user.id)
+    if resume is None:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    db.query(models.ResumeImprovement).filter(
+        models.ResumeImprovement.resume_id == resume_id
+    ).delete()
+
+    db.commit()
+
+    return {"message": "All improvements deleted successfully"}

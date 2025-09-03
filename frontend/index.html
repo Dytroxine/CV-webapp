@@ -37,7 +37,6 @@
                 try {
                     if (isRegistering) {
                         await axios.post(`${API_BASE}/auth/register`, { email, password });
-                        alert('Registration successful! Please login.');
                         setIsRegistering(false);
                     } else {
                         const formData = new FormData();
@@ -134,6 +133,8 @@
             const [improvedContent, setImprovedContent] = useState('');
             const [editingResume, setEditingResume] = useState(null);
             const [savingImprovement, setSavingImprovement] = useState(false);
+            const [showHistory, setShowHistory] = useState(false);
+            const [improvementHistory, setImprovementHistory] = useState([]);
 
             const loadResumes = async () => {
                 try {
@@ -152,19 +153,57 @@
             }, []);
 
             const handleImprove = async (resumeId, resumeData) => {
+                if (improvedContent && improvedContent.includes(resumeData.content)) {
+                    setImprovedContent('');
+                    return;
+                }
+
                 try {
                     const token = localStorage.getItem('token');
                     const response = await axios.post(`${API_BASE}/resumes/${resumeId}/improve`, {}, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     setImprovedContent(response.data.improved_content);
-                    // Убираем setEditingResume - не нужно запоминать для редактирования
+                    setShowHistory(false);
+                    setEditingResume(null);
                 } catch (error) {
                     console.error('Error improving resume:', error);
                 }
             };
+
+            const handleDeleteAllImprovements = async (resumeId) => {
+                try {
+                    const token = localStorage.getItem('token');
+                    await axios.delete(`${API_BASE}/resumes/${resumeId}/improvements`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    loadImprovementHistory(resumeId);
+                } catch (error) {
+                    console.error('Error deleting all improvements:', error);
+                }
+            };
+
+
+            const handleDeleteImprovement = async (improvementId) => {
+                try {
+                    const token = localStorage.getItem('token');
+                    await axios.delete(`${API_BASE}/improvements/${improvementId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+
+                    setImprovementHistory(prev => prev.filter(item => item.id !== improvementId));
+                } catch (error) {
+                    console.error('Error deleting improvement:', error);
+                }
+            };
+
+
             const handleEdit = (resume) => {
+
                 setEditingResume(resume);
+                setImprovedContent('');
+                setShowHistory(false);
             };
             const handleSaveImprovement = async () => {
                 if (!improvedContent) return;
@@ -173,19 +212,28 @@
                 try {
                     const token = localStorage.getItem('token');
 
-                    // Находим ID резюме которое улучшали (последнее на которое нажимали Improve)
                     const lastImprovedResume = resumes.find(r =>
                         improvedContent.includes(r.content) ||
                         improvedContent === r.content + " [Improved]"
                     );
 
                     if (lastImprovedResume) {
+
                         await axios.put(`${API_BASE}/resumes/${lastImprovedResume.id}`, {
                             title: lastImprovedResume.title,
                             content: improvedContent
                         }, {
                             headers: { Authorization: `Bearer ${token}` }
                         });
+
+
+                        await axios.post(`${API_BASE}/resumes/${lastImprovedResume.id}/save-improvement`, {
+                            original_content: lastImprovedResume.content,
+                            improved_content: improvedContent
+                        }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+
                         setImprovedContent('');
                         loadResumes();
                     }
@@ -210,12 +258,33 @@
                     loadResumes();
                 } catch (error) {
                     console.error('Error updating resume:', error);
-                    alert('Error updating resume');
                 }
             };
 
             const handleEditCancel = () => {
                 setEditingResume(null);
+            };
+
+
+            const loadImprovementHistory = async (resumeId) => {
+
+                if (showHistory) {
+                    setShowHistory(false);
+                    return;
+                }
+
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await axios.get(`${API_BASE}/resumes/${resumeId}/improvements`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setImprovementHistory(response.data);
+                    setShowHistory(true);
+                    setImprovedContent('');
+                    setEditingResume(null);
+                } catch (error) {
+                    console.error('Error loading improvement history:', error);
+                }
             };
 
             const handleDelete = async (resumeId) => {
@@ -225,7 +294,9 @@
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     loadResumes();
-                    setImprovedContent(''); // Очищаем улучшенный контент при удалении
+                    setImprovedContent('');
+                    setShowHistory(false);
+                    setImprovementHistory([]);
                 } catch (error) {
                     console.error('Error deleting resume:', error);
                 }
@@ -246,7 +317,7 @@
                         onCancel: () => setShowForm(false)
                     }),
 
-                    // После формы создания резюме добавьте:
+
                     editingResume && React.createElement('div', {
                         style: { border: '1px solid #ffc107', padding: '20px', margin: '10px 0', background: '#fffdf6' }
                     },
@@ -272,6 +343,92 @@
                                 onClick: handleEditCancel,
                                 style: { background: '#666' }
                             }, 'Cancel')
+                        )
+                    ),
+
+                    showHistory && React.createElement('div', {
+                        style: { border: '1px solid #007bff', padding: '15px', margin: '10px 0', background: '#f0f8ff' }
+                    },
+                        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' } },
+                            React.createElement('h3', { style: { margin: 0 } }, '📖 Improvement History'),
+                            improvementHistory.length > 0 && React.createElement('button', {
+                                onClick: () => handleDeleteAllImprovements(improvementHistory[0].resume_id),
+                                style: {
+                                    background: '#ff4757',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px'
+                                }
+                            }, '🗑️ Delete All History')
+                        ),
+
+                        improvementHistory.length > 0 ? (
+                            improvementHistory.map((improvement, index) =>
+                                React.createElement('div', {
+                                    key: improvement.id,
+                                    style: {
+                                        marginBottom: '15px',
+                                        padding: '15px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '8px',
+                                        position: 'relative',
+                                        background: 'white'
+                                    }
+                                },
+
+                                    React.createElement('button', {
+                                        onClick: () => handleDeleteImprovement(improvement.id),
+                                        style: {
+                                            position: 'absolute',
+                                            top: '10px',
+                                            right: '10px',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#ff4757',
+                                            cursor: 'pointer',
+                                            fontSize: '18px',
+                                            fontWeight: 'bold',
+                                            padding: '0',
+                                            width: '25px',
+                                            height: '25px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            borderRadius: '4px',
+                                            transition: 'all 0.2s'
+                                        },
+                                        onMouseOver: (e) => {
+                                            e.target.style.background = '#ff4757';
+                                            e.target.style.color = 'white';
+                                        },
+                                        onMouseOut: (e) => {
+                                            e.target.style.background = 'none';
+                                            e.target.style.color = '#ff4757';
+                                        },
+                                        title: 'Delete this version'
+                                    }, '×'),
+
+                                    React.createElement('h4', { style: { marginRight: '30px', marginTop: '0' } },
+                                        `Version ${improvementHistory.length - index}`
+                                    ),
+                                    React.createElement('p', { style: { color: '#666', fontSize: '12px', margin: '5px 0' } },
+                                        new Date(improvement.created_at).toLocaleString()
+                                    ),
+                                    React.createElement('h5', { style: { margin: '10px 0 5px 0' } }, 'Original:'),
+                                    React.createElement('p', { style: { whiteSpace: 'pre-wrap', background: '#fff9e6', padding: '10px', borderRadius: '4px', margin: '0' } },
+                                        improvement.original_content
+                                    ),
+                                    React.createElement('h5', { style: { margin: '10px 0 5px 0' } }, 'Improved:'),
+                                    React.createElement('p', { style: { whiteSpace: 'pre-wrap', background: '#e6ffe6', padding: '10px', borderRadius: '4px', margin: '0' } },
+                                        improvement.improved_content
+                                    )
+                                )
+                            )
+                        ) : (
+                            React.createElement('p', null, 'No improvement history yet.')
                         )
                     ),
 
